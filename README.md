@@ -21,6 +21,10 @@
 
 Примеры работы с докер: https://github.com/new94/JavaApplicationInDocker
 
+Схема:
+![Сервис менеджмента](https://github.com/new94/JavaServicesDockerCompose/assets/3996014/2e212611-2a01-40ed-96b6-89c409088bad)
+
+
 **Процесс выполнения лабораторной работы:**
 1. Клонируете себе репозиторий лабораторной работы (git clone). 
 2. Создаете от ветки develop ветку с именем student/фамилия_перваябукваимени_lab1.
