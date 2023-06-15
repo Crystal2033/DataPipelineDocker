@@ -1,0 +1,129 @@
+version: "2"
+
+services:
+  postgres:
+    image: postgres
+    container_name: postgresContainer
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_DB: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./sql/create_tables.sql:/docker-entrypoint-initdb.d/create_tables.sql
+    networks:
+      - some-network
+
+  zookeeper:
+    image: docker.io/bitnami/zookeeper:3.8
+    ports:
+      - "2181:2181"
+    volumes:
+      - "zookeeper_data:/bitnami"
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    networks:
+      - some-network
+
+  kafka:
+    image: docker.io/bitnami/kafka:3.4
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    volumes:
+      - "kafka_data:/bitnami"
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://localhost:9093
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=CLIENT
+    depends_on:
+      - zookeeper
+    networks:
+      - some-network
+
+  mongo:
+    image: mongo:latest
+    container_name: mongoContainer
+#    environment:
+#      - MONGO_INITDB_DATABASE=testDB
+    ports:
+      - 27017:27017
+#    volumes:
+#      - - ./sql/create_tables.sql:/docker-entrypoint-initdb.d/create_tables.sql
+#      - ./sql/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - some-network
+
+  redis:
+    image: 'bitnami/redis:latest'
+    container_name: redis
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - REDIS_PORT_NUMBER=6379
+    networks:
+      - some-network
+    ports:
+      - '6379:6379'
+
+
+
+  filtering:
+    build: filtering/
+    depends_on:
+      - postgres
+      - kafka
+      - mongo
+      - redis
+    networks:
+      - some-network
+
+  deduplication:
+    build: deduplication/
+    depends_on:
+      - postgres
+      - kafka
+      - mongo
+      - redis
+    networks:
+      - some-network
+
+  enrichment:
+    build: enrichment/
+    depends_on:
+      - postgres
+      - kafka
+      - mongo
+      - redis
+    networks:
+      - some-network
+
+  management:
+    build: management/
+    ports:
+      - "8080:8080"
+#      - MYAPP_JDBC_URL=jdbc:postgresql://host.docker.internal:5432/postgres
+#      - MYAPP_JDBC_USER=postgres
+#      - MYAPP_JDBC_PASS=postgres
+
+    depends_on:
+      - postgres
+      - kafka
+      - mongo
+      - redis
+    networks:
+      - some-network
+
+volumes:
+  zookeeper_data:
+    driver: local
+  kafka_data:
+    driver: local
+networks:
+  some-network:
+    driver: bridge
+
