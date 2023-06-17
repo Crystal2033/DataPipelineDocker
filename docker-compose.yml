@@ -1,0 +1,125 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_DB : "postgres"
+      POSTGRES_PASSWORD: "postgres"
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./sql/create_tables.sql:/docker-entrypoint-initdb.d/create_tables.sql
+    networks:
+      - node-network
+
+  zookeeper:
+    image: docker.io/bitnami/zookeeper:3.8
+    ports:
+      - "2181:2181"
+    volumes:
+      - "zookeeper_data:/bitnami"
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    networks:
+      - node-network
+  kafka:
+    image: docker.io/bitnami/kafka:3.3.1-debian-11-r38
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    volumes:
+      - "kafka_data:/bitnami"
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://localhost:9093
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=CLIENT
+      - KAFKA_LISTENERS=EXTERNAL_SAME_HOST://:29093,INTERNAL://:9093
+      - KAFKA_ADVERTISED_LISTENERS=INTERNAL://kafka:9093,EXTERNAL_SAME_HOST://localhost:29093
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,EXTERNAL_SAME_HOST:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL
+    depends_on:
+      - zookeeper
+    networks:
+      - node-network
+
+  mongo:
+    image: mongo:latest
+    container_name: mongo
+    ports:
+      - 27017:27017
+    networks:
+      - node-network
+
+  redis:
+    image: 'bitnami/redis:latest'
+    container_name: redis
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - REDIS_PORT_NUMBER=6379
+    networks:
+      - node-network
+    ports:
+      - '6379:6379'
+
+  filtering:
+    build: filtering/
+    container_name: filtering
+    networks:
+      - node-network
+    depends_on:
+      - postgres
+      - kafka
+      - mongo
+      - redis
+
+  deduplication:
+    build: deduplication/
+    container_name: deduplication
+    networks:
+      - node-network
+    depends_on:
+      - postgres
+      - kafka
+      - mongo
+      - redis
+
+  enrichment:
+    build: enrichment/
+    container_name: enrichment
+    networks:
+      - node-network
+    depends_on:
+      - postgres
+      - kafka
+      - mongo
+      - redis
+
+  managment:
+    build: managment/
+    container_name: managment
+    ports:
+      - "8080:8080"
+    networks:
+      - node-network
+    depends_on:
+      - postgres
+      - kafka
+      - mongo
+      - redis
+
+volumes:
+  zookeeper_data:
+    driver: local
+  kafka_data:
+    driver: local
+
+networks:
+  node-network:
+    driver: bridge
